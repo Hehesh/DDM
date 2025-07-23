@@ -3,6 +3,8 @@
 __pycache__/
 project/
 .python-version
+formatted_data/
+simulated_data/
 
 # Ignore temporary or auto-generated files
 *.log
