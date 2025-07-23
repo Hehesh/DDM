@@ -1,0 +1,15 @@
+# Ignore data and unnecessary folders
+*.csv
+__pycache__/
+project/
+.python-version
+
+# Ignore temporary or auto-generated files
+*.log
+*.tmp
+*.swp
+.ipynb_checkpoints/
+.DS_Store
+.env/
+.venv/
+
