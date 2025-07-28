@@ -78,7 +78,9 @@ def save_fixation_properties(parent_dir, path):
     axs[4].grid(True)
 
     fig1.tight_layout()
-    fig1.savefig(os.path.join('mfa_figures', f'fixation_properties_{path[26:-4]}.png'), dpi=300, bbox_inches='tight')
+    if not os.path.exists('mfa_figures'):
+        os.makedirs('mfa_figures')
+    fig1.savefig(os.path.join('mfa_figures', f'fixation_properties_{path[-24:-4]}.png'), dpi=300, bbox_inches='tight')
 
 def save_basic_psychometrics(parent_dir, path):
     df = pd.read_csv(os.path.join(parent_dir, path))
@@ -125,7 +127,9 @@ def save_basic_psychometrics(parent_dir, path):
     axs[2].grid(True)
 
     fig2.tight_layout()
-    fig2.savefig(os.path.join('mfa_figures', f'basic_psychometrics_{path[26:-4]}.png'), dpi=300, bbox_inches='tight')
+    if not os.path.exists('mfa_figures'):
+        os.makedirs('mfa_figures')
+    fig2.savefig(os.path.join('mfa_figures', f'basic_psychometrics_{path[-24:-4]}.png'), dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     import argparse

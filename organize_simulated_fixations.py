@@ -49,6 +49,8 @@ def reformat_fixations(parent_dir, path):
         lambda x: x.max() - x + 1
     )
 
+    if not os.path.exists('formatted_data'):
+        os.makedirs('formatted_data')
     result_df.to_csv(os.path.join('formatted_data', path), index=False)
 
 if __name__ == '__main__':
