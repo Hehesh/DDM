@@ -5,6 +5,7 @@ project/
 .python-version
 formatted_data/
 simulated_data/
+mfa_figures/
 
 # Ignore temporary or auto-generated files
 *.log
