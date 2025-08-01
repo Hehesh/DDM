@@ -53,4 +53,3 @@ if __name__ == '__main__':
 
         for key, value in fit_result.properties.items():
             f.write(f"{key}: {value:.4f}\n")
-

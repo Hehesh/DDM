@@ -53,6 +53,8 @@ def create_trials(num_trials, empirical_distributions, seed=42):
         # keys = [k for k in empirical_distributions['fixations'][1].keys()]
         # weights = [len(empirical_distributions['fixations'][1][k]) for k in keys]
         # sampled_key = float(random.choices(keys, weights=weights, k=1)[0])
+
+        # Change this line of code to represent either one subject or empirical value combos
         sampled_key = random.choice(np.linspace(-4, 4, 33))
 
         # Randomly generate a viable left value
@@ -70,28 +72,11 @@ def create_trials(num_trials, empirical_distributions, seed=42):
     return trials
 
 def get_empirical_distributions(path, bin_size):
-    """
-    Computes empirical fixation distributions from fixation tuples in a dataframe.
-    
-    Args:
-      df: pandas DataFrame with columns including:
-          - 'fixation' (tuple of 0,1,2,4)
-          - 'avgWTP_left' (float)
-          - 'avgWTP_right' (float)
-      bin_size: duration in seconds per element of fixation tuple.
-    
-    Returns:
-      A dict:
-        {
-          'probFixLeftFirst': float,
-          'latencies': np.ndarray,
-          'transitions': np.ndarray,
-          'fixations': dict
-        }
-    """
+    """ Computes empirical fixation distributions from fixation 
+    tuples in a dataframe."""
 
-    raw_df = pd.read_csv(path)
-    exclusions = pd.read_csv('/Users/braydenchien/Desktop/Enkavilab/DDM/dropped_trials.csv')
+    raw_df = pd.read_csv(path) # path for 1ms_trial_data.csv
+    exclusions = pd.read_csv('/Users/braydenchien/Desktop/Enkavilab/DDM/dropped_trials.csv') # Replace with your path
 
     excluded_subjects = set(exclusions['parcode'].dropna().unique())
     excluded_trials = set(exclusions['trial'].dropna().unique()) if 'exclude_trial' in exclusions.columns else set()
@@ -323,9 +308,11 @@ def reformat_fixations(parent_dir, path):
     result_df.to_csv(os.path.join('formatted_data', path), index=False)
 
 def simulate(bin_size, model_conditions, trials, seed=42, save_results=True):
-    results_df = list()
+    random.seed(seed)
 
     model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'])
+
+    results_df = list()
 
     for trial in trials:
         res = model.simulate_trial(trial)
