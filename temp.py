@@ -1,4 +1,5 @@
 import numpy as np
+import simulation
 
 def generate_fixations(bin_size, relative_value_difference, empirical_distributions, total_duration_s=30.0, seed=42):
     """
@@ -116,3 +117,50 @@ def generate_fixations(bin_size, relative_value_difference, empirical_distributi
         return tuple(fixation_sequence)
     except Exception:
         return None
+    
+def get_corrected_subject_empirical_distributions(sub_df):
+    bin_size = 1
+    value_diffs = np.arange(-4, 4.25, 0.25)
+    legend = {
+        "left": {1},
+        "right": {2},
+        "transition": {0}, 
+        "blank_fixation": {4}
+    }
+    fix_col = 'fixation'
+    left_value_col = 'avgWTP_left'
+    right_value_col = 'avgWTP_right'
+
+    empirical_distributions = simulation.get_empirical_distributions(
+        sub_df, 
+        bin_size, 
+        value_diffs, 
+        legend=legend, 
+        fixation_col=fix_col, 
+        v_left_col=left_value_col, 
+        v_right_col=right_value_col,
+        num_fix_dists=3,
+        time_step=10,
+        max_fix_time=3000
+    )
+
+    # Latencies
+    lst = sorted(empirical_distributions['latencies'])
+    empirical_distributions['latencies'] = lst[:int(len(lst) * 0.95)]
+
+    # Transitions
+    lst = sorted(empirical_distributions['transitions'])
+    empirical_distributions['transitions'] = lst[:int(len(lst) * 0.95)]
+
+    # Fixation 1
+
+    for key in list(empirical_distributions['fixations'][1].keys()):
+        lst = sorted(empirical_distributions['fixations'][1][key])
+        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * 0.95)]
+
+    # Fixation 2
+    for key in list(empirical_distributions['fixations'][2].keys()):
+        lst = sorted(empirical_distributions['fixations'][2][key])
+        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * 0.95)]
+
+    return empirical_distributions

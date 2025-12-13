@@ -32,7 +32,7 @@ def create_model(drift_rate, theta, noise):
         nondecision=0,
         conditions=["avgWTP_left", "avgWTP_right", "fixation"],
         choice_names=("left", "right"),
-        T_dur=10,
+        T_dur=30,
         dx=0.001,
         dt=0.001
     )
