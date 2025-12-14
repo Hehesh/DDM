@@ -71,9 +71,52 @@ def create_trials(num_trials, empirical_distributions, seed=42):
 
     return trials
 
+def get_corrected_subject_empirical_distributions(
+        sub_df, 
+        value_diffs, 
+        *,
+        legend: dict = None, 
+        fixation_col: str = None, 
+        left_value_col: str = None, 
+        right_value_col: str = None, 
+        cutoff: float = 1.0
+    ):
+
+    empirical_distributions = get_empirical_distributions(
+        sub_df, 
+        value_diffs, 
+        legend=legend, 
+        fixation_col=fixation_col, 
+        v_left_col=left_value_col, 
+        v_right_col=right_value_col,
+        num_fix_dists=3,
+        min_fix_time=10,
+        max_fix_time=3000
+    )
+
+    # Latencies
+    lst = sorted(empirical_distributions['latencies'])
+    empirical_distributions['latencies'] = lst[:int(len(lst) * cutoff)]
+
+    # Transitions
+    lst = sorted(empirical_distributions['transitions'])
+    empirical_distributions['transitions'] = lst[:int(len(lst) * cutoff)]
+
+    # Fixation 1
+
+    for key in list(empirical_distributions['fixations'][1].keys()):
+        lst = sorted(empirical_distributions['fixations'][1][key])
+        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * cutoff)]
+
+    # Fixation 2
+    for key in list(empirical_distributions['fixations'][2].keys()):
+        lst = sorted(empirical_distributions['fixations'][2][key])
+        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * cutoff)]
+
+    return empirical_distributions
+
 def get_empirical_distributions(
     df: pd.DataFrame,
-    bin_size: float,
     value_diffs: list,
     *,
     legend: dict = None,
@@ -86,7 +129,7 @@ def get_empirical_distributions(
     location_col: str = None,
     assume_bins: bool = True,
     num_fix_dists: int = 2,
-    time_step: float | None = None,
+    min_fix_time: float | None = None,
     max_fix_time: float | None = None,
 ):
     """
@@ -202,8 +245,8 @@ def get_empirical_distributions(
             start_idx = events_df[start_col].to_numpy(dtype=int)
             end_idx   = events_df[end_col].to_numpy(dtype=int)
         else:
-            start_idx = np.floor(events_df[start_col].to_numpy() / bin_size).astype(int)
-            end_idx   = np.floor(events_df[end_col].to_numpy() / bin_size).astype(int)
+            start_idx = np.floor(events_df[start_col].to_numpy()).astype(int)
+            end_idx   = np.floor(events_df[end_col].to_numpy()).astype(int)
         L = int(np.max(end_idx)) + 1
         seq = np.empty(L, dtype=object)
         seq[:] = None
@@ -304,7 +347,7 @@ def get_empirical_distributions(
             run_len = np.count_nonzero(~exclude[start:i])
             if run_len == 0:
                 continue
-            dur = run_len * bin_size
+            dur = run_len
 
             if lab in ("L", "R"):
                 if not first_fix_reached:
@@ -325,7 +368,7 @@ def get_empirical_distributions(
                     latency_time += dur
                 else:
                     # AFTER first fixation: treat each T or B run as its own transition
-                    ok_lo = (time_step is None) or (dur >= time_step)
+                    ok_lo = (min_fix_time is None) or (dur >= min_fix_time)
                     ok_hi = (max_fix_time is None) or (dur <= max_fix_time)
                     if ok_lo and ok_hi:
                         transitions_list.append(dur)
@@ -342,76 +385,129 @@ def get_empirical_distributions(
         }
     }
 
-def generate_fixations(bin_size, relative_value_difference, empirical_distributions):
+def generate_fixations(dt, relative_value_difference, empirical_distributions, max_duration_s=30.0, seed=42):
     """
-    Generates a fixation sequence binned in time using empirical distributions.
-    For subsequent fixations (after the first), pools from both signs of 
-    relative value difference. The first fixation remains sign-dependent.
+    Return a tuple of fixation codes sampled on a fixed `dt` grid.
+
+    IMPORTANT:
+    - `dt` must match the model's dt used by the DDM solver.
+    - One element in the returned tuple represents the interval [i*dt, (i+1)*dt).
     """
-    probLeftFirst = empirical_distributions['probFixLeftFirst']
-    left_first = np.random.rand() < probLeftFirst
 
-    # Flip sign for matching fixation distribution to fixated side
-    rel_val_for_first = relative_value_difference if left_first else -relative_value_difference
+    if dt <= 0:
+        raise ValueError("dt must be a positive time step in seconds")
 
-    events = []
-    global_time = 0.0
+    try:
+        rng = np.random.default_rng(seed)
 
-    # Initial latency
-    latency = np.random.choice(empirical_distributions['latencies'])
-    events.append((global_time, global_time + latency, 0))
-    global_time += latency
+        # --- Normalize units to seconds ---
+        def to_seconds(arr):
+            arr = np.asarray(arr)
+            return arr / 1000.0
 
-    # First fixation — sign-dependent
-    first_fixation_duration = np.random.choice(
-        empirical_distributions['fixations'][1][rel_val_for_first]
-    )
-    code = 1 if left_first else 2
-    events.append((global_time, global_time + first_fixation_duration, code))
-    global_time += first_fixation_duration
+        latencies_s = to_seconds(empirical_distributions['latencies'])
+        transitions_s = to_seconds(empirical_distributions['transitions'])
 
-    # Prepare for alternation
-    current_side_code = 2 if code == 1 else 1
-    abs_val = abs(relative_value_difference)
+        # fixations structure: {1: {rel_val: [durations]}, 2: {...}}
+        # Convert all fixation durations to seconds, but preserve the dict shape.
+        def fix_to_seconds(fix_dict):
+            out = {}
+            for rel_val, durations in fix_dict.items():
+                out[rel_val] = to_seconds(durations)
+            return out
 
-    def pooled_fixation_durations(fixation_dict, abs_val):
-        durations = []
-        if abs_val in fixation_dict:
-            durations.extend(fixation_dict[abs_val])
-        if -abs_val in fixation_dict:
-            durations.extend(fixation_dict[-abs_val])
-        return durations
+        fix1 = fix_to_seconds(empirical_distributions['fixations'][1])
+        fix2 = fix_to_seconds(empirical_distributions['fixations'][2])
 
-    # Subsequent fixations — pooled
-    while global_time < 30.0:
-        # Transition
-        transition_duration = np.random.choice(empirical_distributions['transitions'])
-        events.append((global_time, global_time + transition_duration, 0))
-        global_time += transition_duration
+        # Helper: get durations for a given rel_val with nearest-key fallback (floats as keys are brittle)
+        def get_durations(dct, key):
+            if key in dct:
+                return dct[key]
+            # nearest key fallback
+            k = min(dct.keys(), key=lambda kk: abs(kk - key))
+            return dct[k]
 
-        # Fixation from pooled durations
-        next_durations = pooled_fixation_durations(empirical_distributions['fixations'][2], abs_val)
-        next_fixation_duration = np.random.choice(next_durations)
-        events.append((global_time, global_time + next_fixation_duration, current_side_code))
-        global_time += next_fixation_duration
+        # Pooled durations (abs value across signs)
+        def pooled_fixation_durations(fixation_dict, abs_val):
+            pool = []
+            # exact match
+            if abs_val in fixation_dict: pool.extend(fixation_dict[abs_val])
+            if -abs_val in fixation_dict: pool.extend(fixation_dict[-abs_val])
+            # nearest-key fallback if pool empty
+            if not len(pool):
+                k1 = min(fixation_dict.keys(), key=lambda kk: abs(abs(kk) - abs_val))
+                pool.extend(fixation_dict[k1])
+            return np.asarray(pool)
 
-        # Alternate side
-        current_side_code = 2 if current_side_code == 1 else 1
+        probLeftFirst = float(empirical_distributions['probFixLeftFirst'])
+        left_first = rng.random() < probLeftFirst
 
-    # Bin into time steps
-    num_bins = int(30 / bin_size)
-    fixation_sequence = []
+        # First fixation sign selection
+        rel_val_for_first = relative_value_difference if left_first else -relative_value_difference
 
-    for i in range(num_bins):
-        bin_start_time = i * bin_size
-        for start, end, event_code in events:
-            if start <= bin_start_time < end:
-                fixation_sequence.append(event_code)
-                break
-        else:
-            fixation_sequence.append(0)
+        events = []  # (start_s, end_s, code)
+        global_time = 0.0
 
-    return tuple(fixation_sequence)
+        # Initial latency
+        latency = rng.choice(latencies_s)
+        events.append((global_time, global_time + latency, 0))
+        global_time += latency
+
+        # First fixation — sign dependent
+        first_fixation_duration = rng.choice(get_durations(fix1, rel_val_for_first))
+        code = 1 if left_first else 2
+        events.append((global_time, global_time + first_fixation_duration, code))
+        global_time += first_fixation_duration
+
+        # Prepare for alternation
+        current_side_code = 2 if code == 1 else 1
+        abs_val = abs(relative_value_difference)
+
+        # Subsequent fixations — pooled
+        # Guard against empty transitions or pooled durations
+        if len(transitions_s) == 0:
+            raise ValueError("empirical_distributions['transitions'] is empty after unit conversion.")
+        pooled2 = pooled_fixation_durations(fix2, abs_val)
+        if len(pooled2) == 0:
+            raise ValueError("No pooled fixation durations for subsequent fixations.")
+
+        while global_time < max_duration_s:
+            # Transition
+            tdur = rng.choice(transitions_s)
+            start = global_time
+            end   = min(global_time + tdur, max_duration_s)
+            events.append((start, end, 0))
+            global_time = end
+            if global_time >= max_duration_s: break
+
+            # Fixation
+            fdur = rng.choice(pooled2)
+            start = global_time
+            end   = min(global_time + fdur, max_duration_s)
+            events.append((start, end, current_side_code))
+            global_time = end
+
+            # Alternate side
+            current_side_code = 2 if current_side_code == 1 else 1
+
+        # Bin to fixed time grid in seconds
+        num_fixes = int(np.floor(max_duration_s / dt))
+        fixation_sequence = []
+        # Sweep through events once (O(Nbins + Nevents))
+        e_idx = 0
+        for i in range(num_fixes):
+            t = i * dt
+            # advance event pointer
+            while e_idx < len(events) and not (events[e_idx][0] <= t < events[e_idx][1]):
+                e_idx += 1
+            if e_idx < len(events) and events[e_idx][0] <= t < events[e_idx][1]:
+                fixation_sequence.append(events[e_idx][2])
+            else:
+                fixation_sequence.append(0)
+
+        return tuple(fixation_sequence)
+    except Exception:
+        return None
 
 def reformat_fixations(parent_dir, path):
     df = pd.read_csv(os.path.join(parent_dir, path))
