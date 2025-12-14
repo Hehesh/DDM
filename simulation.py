@@ -6,28 +6,26 @@ import random
 import ast
 import os
 
-def create_model(drift_rate, theta, noise):
-    # Wrapper function to hyperparameterize drift_rate
-    def make_drift_function(drift_rate):
-        def drift_function(avgWTP_left, avgWTP_right, fixation, t):
-            fixation_index = min(int(t/0.001), len(fixation)-1)
-            current_fixation = fixation[fixation_index]
-            if current_fixation == 0: # saccade
-                return 0
-            elif current_fixation == 1: # left
-                return drift_rate * (avgWTP_left -  avgWTP_right * theta)
-            else: # right
-                return drift_rate * (avgWTP_left * theta -  avgWTP_right)
+def create_model(drift, theta, noise, dt):
+    def drift_function(x, t, avgWTP_left, avgWTP_right, fixation):
+        fixation_index = min(int(t/dt), len(fixation)-1)
+        current_fixation = fixation[fixation_index]
+        if current_fixation == 0: # saccade
+            drift_val = 0
+        elif current_fixation == 1: # left
+            drift_val = drift * (avgWTP_left -  avgWTP_right * theta)
+        else: # right
+            drift_val = drift * (avgWTP_left * theta -  avgWTP_right)
         
-        return drift_function
+        return np.ones_like(x) * drift_val
     
-    # Define the drift function
-    my_drift_function = make_drift_function(drift_rate)
+    def noise_function(x, t):
+        return np.ones_like(x) * noise
 
     # Define the model
     model = pyddm.gddm(
-        drift=my_drift_function,
-        noise=noise,
+        drift=drift_function,
+        noise=noise_function,
         bound=1,
         nondecision=0,
         conditions=["avgWTP_left", "avgWTP_right", "fixation"],
@@ -557,17 +555,18 @@ def reformat_fixations(parent_dir, path):
 
     result_df.to_csv(os.path.join('formatted_data', path), index=False)
 
-def simulate(bin_size, model_conditions, trials, seed=42, save_results=True):
+def simulate(dt, model_conditions, trials, seed=42, save_results=True):
     random.seed(seed)
 
-    model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'])
+    model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'], dt)
 
     results_df = list()
 
     for trial in trials:
         res = model.simulate_trial(trial)
-        trial_fixation_tuple = trial['fixation'][:int(len(res)/(bin_size/model.dt))]
-        trial_RT = round(len(trial_fixation_tuple)*bin_size, 3)
+        # trial_fixation_tuple = trial['fixation'][:int(len(res)/(dt/model.dt))]
+        trial_fixation_tuple = trial['fixation'][:len(res)]
+        trial_RT = round(len(trial_fixation_tuple)*dt, 3)
         if res[-1] >= 1:
             choice = 0
         elif res[-1] <= -1:
