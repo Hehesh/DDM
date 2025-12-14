@@ -69,8 +69,8 @@ def create_trials(num_trials, empirical_distributions, seed=42):
 
     return trials
 
-def get_corrected_subject_empirical_distributions(
-        sub_df, 
+def get_corrected_empirical_distributions(
+        df, 
         value_diffs, 
         *,
         legend: dict = None, 
@@ -81,7 +81,7 @@ def get_corrected_subject_empirical_distributions(
     ):
 
     empirical_distributions = get_empirical_distributions(
-        sub_df, 
+        df, 
         value_diffs, 
         legend=legend, 
         fixation_col=fixation_col, 
