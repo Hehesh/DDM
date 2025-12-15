@@ -32,7 +32,7 @@ def create_model(drift, theta, noise, dt):
         choice_names=("left", "right"),
         T_dur=30,
         dx=0.001,
-        dt=0.001
+        dt=dt
     )
 
     model._overlay = OverlayChain(overlays=[])
