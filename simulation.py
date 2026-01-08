@@ -576,8 +576,9 @@ def reformat_fixations(parent_dir, path):
 
     result_df.to_csv(os.path.join('formatted_data', path), index=False)
 
-def simulate(dt, model_conditions, trials, seed=42, save_results=True):
-    random.seed(seed)
+# In order to ensure reproducibility, set the seed right before all simulate calls,
+# but after generate_fixations. In the future, I will discuss rng settings with professor.
+def simulate(dt, model_conditions, trials, save_results=True):
 
     model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'], dt)
 
@@ -585,7 +586,6 @@ def simulate(dt, model_conditions, trials, seed=42, save_results=True):
 
     for trial in trials:
         res = model.simulate_trial(trial)
-        # trial_fixation_tuple = trial['fixation'][:int(len(res)/(dt/model.dt))]
         trial_fixation_tuple = trial['fixation'][:len(res)]
         trial_RT = round(len(trial_fixation_tuple)*dt, 3)
         if res[-1] >= 1:
