@@ -383,7 +383,7 @@ def get_empirical_distributions(
         }
     }
 
-def generate_fixations(dt, relative_value_difference, empirical_distributions, max_duration_s=30.0, seed=42):
+def generate_fixations(dt, relative_value_difference, empirical_distributions, max_duration_s=30.0, rng):
     """
     Return a tuple of fixation codes sampled on a fixed `dt` grid.
 
@@ -396,8 +396,6 @@ def generate_fixations(dt, relative_value_difference, empirical_distributions, m
         raise ValueError("dt must be a positive time step in seconds")
 
     try:
-        rng = np.random.default_rng(seed)
-
         # --- Normalize units to seconds ---
         def to_seconds(arr):
             arr = np.asarray(arr)
