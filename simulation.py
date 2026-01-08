@@ -77,7 +77,7 @@ def get_corrected_empirical_distributions(
         fixation_col: str = None, 
         left_value_col: str = None, 
         right_value_col: str = None, 
-        cutoff: float = 1.0
+        cutoff: float = 0.9   # central percentage kept
     ):
 
     empirical_distributions = get_empirical_distributions(
@@ -92,26 +92,47 @@ def get_corrected_empirical_distributions(
         max_fix_time=3000
     )
 
+    def winsorize_list(lst, middle_frac=0.9):
+        """
+        Winsorize to the central `middle_frac` of the data.
+        E.g. middle_frac=0.9 -> bottom 5% and top 5% clipped.
+        """
+        if len(lst) == 0:
+            return lst
+
+        arr = np.asarray(sorted(lst))
+        alpha = (1.0 - middle_frac) / 2.0
+
+        lo = np.quantile(arr, alpha)
+        hi = np.quantile(arr, 1.0 - alpha)
+
+        arr = np.clip(arr, lo, hi)
+        return arr.tolist()
+
     # Latencies
-    lst = sorted(empirical_distributions['latencies'])
-    empirical_distributions['latencies'] = lst[:int(len(lst) * cutoff)]
+    empirical_distributions['latencies'] = winsorize_list(
+        empirical_distributions['latencies'], cutoff
+    )
 
     # Transitions
-    lst = sorted(empirical_distributions['transitions'])
-    empirical_distributions['transitions'] = lst[:int(len(lst) * cutoff)]
+    empirical_distributions['transitions'] = winsorize_list(
+        empirical_distributions['transitions'], cutoff
+    )
 
     # Fixation 1
-
-    for key in list(empirical_distributions['fixations'][1].keys()):
-        lst = sorted(empirical_distributions['fixations'][1][key])
-        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * cutoff)]
+    for key in empirical_distributions['fixations'][1]:
+        empirical_distributions['fixations'][1][key] = winsorize_list(
+            empirical_distributions['fixations'][1][key], cutoff
+        )
 
     # Fixation 2
-    for key in list(empirical_distributions['fixations'][2].keys()):
-        lst = sorted(empirical_distributions['fixations'][2][key])
-        empirical_distributions['fixations'][1][key] = lst[:int(len(lst) * cutoff)]
+    for key in empirical_distributions['fixations'][2]:
+        empirical_distributions['fixations'][2][key] = winsorize_list(
+            empirical_distributions['fixations'][2][key], cutoff
+        )
 
     return empirical_distributions
+
 
 def get_empirical_distributions(
     df: pd.DataFrame,
