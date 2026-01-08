@@ -579,14 +579,18 @@ def reformat_fixations(parent_dir, path):
 # In order to ensure reproducibility, set the seed right before all simulate calls,
 # but after generate_fixations. In the future, I will discuss rng settings with professor.
 def simulate(dt, model_conditions, trials, seed=42, save_results=True):
-    # Seed DOES NOT affect simulate_trial. It is only used for naming purposes
+    # PyDDM has a default seed keyword that makes uniform brownian motion sampling.
+    # Therefore, we need to set the seed for each trial here.
+
+    master_rng = np.random.default_rng(seed)
+    trial_seeds = master_rng.integers(0, 2**32 - 1, size=300) # size=len(right_trials_dict)
 
     model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'], dt)
 
     results_df = list()
 
-    for trial in trials:
-        res = model.simulate_trial(trial)
+    for trial, trial_seed in zip(trials, trial_seeds):
+        res = model.simulate_trial(trial, seed=trial_seed)
         trial_fixation_tuple = trial['fixation'][:len(res)]
         trial_RT = round(len(trial_fixation_tuple)*dt, 3)
         if res[-1] >= 1:
