@@ -578,7 +578,8 @@ def reformat_fixations(parent_dir, path):
 
 # In order to ensure reproducibility, set the seed right before all simulate calls,
 # but after generate_fixations. In the future, I will discuss rng settings with professor.
-def simulate(dt, model_conditions, trials, save_results=True):
+def simulate(dt, model_conditions, trials, seed=42, save_results=True):
+    # Seed DOES NOT affect simulate_trial. It is only used for naming purposes
 
     model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'], dt)
 
