@@ -583,7 +583,7 @@ def simulate(dt, model_conditions, trials, seed=42, save_results=True):
     # Therefore, we need to set the seed for each trial here.
 
     master_rng = np.random.default_rng(seed)
-    trial_seeds = master_rng.integers(0, 2**32 - 1, size=300) # size=len(right_trials_dict)
+    trial_seeds = master_rng.integers(0, 2**32 - 1, size=len(trials))
 
     model = create_model(model_conditions['drift_rate'], model_conditions['theta'], model_conditions['noise'], dt)
 
