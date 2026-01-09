@@ -525,8 +525,8 @@ def generate_fixations(dt, relative_value_difference, empirical_distributions, m
                 fixation_sequence.append(0)
 
         return tuple(fixation_sequence)
-    except Exception:
-        return None
+    except Exception as e:
+        raise RuntimeError(f"generate_fixations failed for dt={dt}, rvd={relative_value_difference}") from e
 
 def reformat_fixations(parent_dir, path):
     df = pd.read_csv(os.path.join(parent_dir, path))
