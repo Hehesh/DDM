@@ -13,9 +13,9 @@ def create_model(drift, theta, noise, dt):
         if current_fixation == 0: # saccade
             drift_val = 0
         elif current_fixation == 1: # left
-            drift_val = drift * (avgWTP_left -  avgWTP_right * theta)
+            drift_val = drift * (avgWTP_left - avgWTP_right * theta)
         else: # right
-            drift_val = drift * (avgWTP_left * theta -  avgWTP_right)
+            drift_val = drift * (avgWTP_left * theta - avgWTP_right)
         
         return np.ones_like(x) * drift_val
     
