@@ -1,4 +1,4 @@
--e git+ssh://git@github.com/goptavares/aDDM-Toolbox.git@714b0803db45e106b03533f1873e2c521ee558b0#egg=addm_toolbox
+# -e git+ssh://git@github.com/goptavares/aDDM-Toolbox.git@714b0803db45e106b03533f1873e2c521ee558b0#egg=addm_toolbox
 appnope==0.1.4
 asttokens==3.0.0
 certifi==2025.11.12
@@ -41,7 +41,7 @@ prompt_toolkit==3.0.51
 psutil==7.0.0
 ptyprocess==0.7.0
 pure_eval==0.2.3
--e git+ssh://git@github.com/Hehesh/PyDDM.git@f4ed1eb3b38298a6a4d2b85507389448810f37d8#egg=pyddm
+# -e git+ssh://git@github.com/Hehesh/PyDDM.git@f4ed1eb3b38298a6a4d2b85507389448810f37d8#egg=pyddm
 Pygments==2.19.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0

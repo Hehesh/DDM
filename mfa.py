@@ -464,8 +464,8 @@ def plot_basic_psychometrics(df: pd.DataFrame):
                                       labels=[0, 1, 2, 3, 4])
     summary = first_fix_df.groupby('diff_bin', observed=True)['RT'].agg(['mean', sem]).reset_index()
     summary.columns = ['diff_bin', 'mean_RT', 'sem_RT']
-    summary['mean_RT'] *= 1000
-    summary['sem_RT'] *= 1000
+    # summary['mean_RT'] *= 1000
+    # summary['sem_RT'] *= 1000
 
     axs[1].errorbar(summary['diff_bin'].astype(int), summary['mean_RT'],
                     yerr=summary['sem_RT'], fmt='o-', capsize=5)
