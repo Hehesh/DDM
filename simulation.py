@@ -133,6 +133,37 @@ def get_corrected_empirical_distributions(
 
     return empirical_distributions
 
+def get_corrected_numbered_empirical_distributions(
+    df,
+    *,
+    legend=None,
+    fixation_col=None,
+    cutoff=0.9,
+):
+    empirical = create_numbered_empirical_distributions(
+        df,
+        legend=legend,
+        fixation_col=fixation_col,
+    )
+
+    def winsorize(arr, middle_frac=0.9):
+        if len(arr) == 0:
+            return arr
+        arr = np.sort(np.asarray(arr))
+        alpha = (1.0 - middle_frac) / 2.0
+        lo = np.quantile(arr, alpha)
+        hi = np.quantile(arr, 1.0 - alpha)
+        return np.clip(arr, lo, hi)
+
+    empirical["latencies"] = winsorize(empirical["latencies"], cutoff)
+    empirical["transitions"] = winsorize(empirical["transitions"], cutoff)
+
+    for k in empirical["fixations"]:
+        empirical["fixations"][k] = winsorize(
+            empirical["fixations"][k], cutoff
+        )
+
+    return empirical
 
 def get_empirical_distributions(
     df: pd.DataFrame,
@@ -402,6 +433,197 @@ def get_empirical_distributions(
             k: {kk: np.array(vv, dtype=float) for kk, vv in v.items()}
             for k, v in fixations_dict.items()
         }
+    }
+
+def create_numbered_empirical_distributions(
+    df: pd.DataFrame,
+    *,
+    legend: dict = None,
+    fixation_col: str = None,
+    trial_col: str = None,
+    start_col: str = None,
+    end_col: str = None,
+    location_col: str = None,
+    assume_bins: bool = True,
+    num_fix_dists: int = 3,
+    min_fix_time: float | None = None,
+    max_fix_time: float | None = None,
+):
+    """
+    Same as get_empirical_distributions, but fixation durations are pooled
+    purely by fixation number (ordinal), not by value-difference bins.
+
+    Returns:
+    {
+        "probFixLeftFirst": float,
+        "latencies": np.ndarray,
+        "transitions": np.ndarray,
+        "fixations": {
+            1: np.ndarray,
+            2: np.ndarray,
+            ...
+        }
+    }
+    """
+
+    # ---------- Legend normalization ----------
+    if legend is None:
+        legend = {"left": {1}, "right": {2}, "transition": {0}, "blank_fixation": {3}}
+
+    Lset = set(legend.get("left", set()))
+    Rset = set(legend.get("right", set()))
+    Tset = set(legend.get("transition", {0}))
+    Bset = set(legend.get("blank_fixation", {3}))
+    ignore_set = set(legend.get("ignore", set()))
+
+    def classify(code):
+        if code in ignore_set:
+            return None
+        if code in Lset:
+            return "L"
+        if code in Rset:
+            return "R"
+        if code in Tset:
+            return "T"
+        if code in Bset:
+            return "B"
+        return "T"
+
+    def rasterize_from_events(events_df):
+        if events_df.empty:
+            return np.array([], dtype=object)
+
+        if assume_bins:
+            start_idx = events_df[start_col].to_numpy(dtype=int)
+            end_idx = events_df[end_col].to_numpy(dtype=int)
+        else:
+            start_idx = np.floor(events_df[start_col].to_numpy()).astype(int)
+            end_idx = np.floor(events_df[end_col].to_numpy()).astype(int)
+
+        L = int(np.max(end_idx)) + 1
+        seq = np.empty(L, dtype=object)
+        seq[:] = None
+
+        locs = events_df[location_col].to_numpy()
+
+        for s, e, loc in zip(start_idx, end_idx, locs):
+            if isinstance(loc, str):
+                key = loc.strip().lower()
+                code = "left" if key == "left" else ("right" if key == "right" else loc)
+            else:
+                code = loc
+            seq[s:e+1] = code
+
+        seq[seq == None] = 0  # noqa: E711
+        return seq
+
+    # ---------- Containers ----------
+    fixations_dict = {k: [] for k in range(1, num_fix_dists + 1)}
+    latencies_list, transitions_list = [], []
+    count_left_first = 0
+    count_total_first = 0
+
+    # ---------- Trial iterator ----------
+    if fixation_col is not None:
+        trial_iter = df.itertuples(index=False)
+        get_seq = lambda row: getattr(row, fixation_col)
+    else:
+        if not all([trial_col, start_col, end_col, location_col]):
+            raise ValueError("Missing event reconstruction columns.")
+
+        grouped = df.groupby(trial_col, sort=False)
+
+        def event_trial_iter():
+            for _, g in grouped:
+                yield rasterize_from_events(g)
+
+        trial_iter = event_trial_iter()
+        get_seq = lambda seq: seq
+
+    # ---------- Main loop ----------
+    for row in trial_iter:
+        raw_seq = np.asarray(get_seq(row), dtype=object)
+        if raw_seq.size == 0:
+            continue
+
+        cls = np.array([classify(c) for c in raw_seq], dtype=object)
+        keep = cls != None  # noqa: E711
+        if not np.any(keep):
+            continue
+        cls = cls[keep]
+
+        lr_idx = np.flatnonzero((cls == "L") | (cls == "R"))
+        if lr_idx.size <= 1:
+            continue
+
+        exclude = np.zeros(cls.size, dtype=bool)
+        last_i = lr_idx[-1]
+        last_label = cls[last_i]
+
+        j = last_i
+        while j >= 0 and cls[j] == last_label:
+            exclude[j] = True
+            j -= 1
+        exclude[last_i + 1:] = True
+
+        N = cls.size
+        i = 0
+        first_fix_reached = False
+        latency_time = 0.0
+        fix_number = 1
+
+        while i < N:
+            if exclude[i]:
+                i += 1
+                continue
+
+            lab = cls[i]
+            start = i
+            i += 1
+
+            while i < N and (exclude[i] or cls[i] == lab):
+                i += 1
+
+            run_len = np.count_nonzero(~exclude[start:i])
+            if run_len == 0:
+                continue
+
+            dur = run_len
+
+            if lab in ("L", "R"):
+                if not first_fix_reached:
+                    first_fix_reached = True
+                    count_total_first += 1
+                    if lab == "L":
+                        count_left_first += 1
+                    latencies_list.append(latency_time)
+
+                bucket = min(fix_number, num_fix_dists)
+                fixations_dict[bucket].append(dur)
+                fix_number += 1
+
+            elif lab in ("T", "B"):
+                if not first_fix_reached:
+                    latency_time += dur
+                else:
+                    ok_lo = (min_fix_time is None) or (dur >= min_fix_time)
+                    ok_hi = (max_fix_time is None) or (dur <= max_fix_time)
+                    if ok_lo and ok_hi:
+                        transitions_list.append(dur)
+
+    prob_fix_left_first = (
+        count_left_first / count_total_first
+        if count_total_first > 0
+        else np.nan
+    )
+
+    return {
+        "probFixLeftFirst": prob_fix_left_first,
+        "latencies": np.array(latencies_list, dtype=float),
+        "transitions": np.array(transitions_list, dtype=float),
+        "fixations": {
+            k: np.array(v, dtype=float) for k, v in fixations_dict.items()
+        },
     }
 
 def generate_fixations(dt, relative_value_difference, empirical_distributions, max_duration_s=30.0, rng=None):
