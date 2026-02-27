@@ -1,4 +1,4 @@
-# -e git+ssh://git@github.com/goptavares/aDDM-Toolbox.git@714b0803db45e106b03533f1873e2c521ee558b0#egg=addm_toolbox
+-e git+ssh://git@github.com/goptavares/aDDM-Toolbox.git@4627b3cfcf77b2462267d80267253761de4e8571#egg=addm_toolbox
 appnope==0.1.4
 asttokens==3.0.0
 certifi==2025.11.12
@@ -10,6 +10,7 @@ cycler==0.12.1
 deap==1.4.3
 debugpy==1.8.14
 decorator==5.2.1
+-e git+https://github.com/Hehesh/efficient-fpt.git@f2fb4e9a596a8ab8bf4bb81a9ceca3ccac7164e7#egg=efficient_fpt
 executing==2.2.0
 fonttools==4.58.1
 future==1.0.0
@@ -41,7 +42,7 @@ prompt_toolkit==3.0.51
 psutil==7.0.0
 ptyprocess==0.7.0
 pure_eval==0.2.3
-# -e git+ssh://git@github.com/Hehesh/PyDDM.git@f4ed1eb3b38298a6a4d2b85507389448810f37d8#egg=pyddm
+-e git+ssh://git@github.com/Hehesh/PyDDM.git@3d14fb652c16d3754c65ab7af2616adb9844da5c#egg=pyddm
 Pygments==2.19.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
