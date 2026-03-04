@@ -3,6 +3,105 @@ import pandas as pd
 import numpy as np
 from math import floor, ceil
 
+def compress_fixations(fixation_trials, max_d, dt):
+    """
+    Inverse of expand_fixations (up to dt resolution),
+    with zero-padded saccade arrays, using
+    left-inclusive / right-exclusive convention.
+
+    Parameters
+    ----------
+    fixation_trials : iterable of tuple[int]
+        Output of expand_fixations
+    dt : float
+        timestep size (seconds)
+    max_d : int
+        maximum number of saccades per trial (including padding)
+
+    Returns
+    -------
+    sacc_data : list of np.ndarray, shape (max_d,)
+        Zero-padded saccade times (seconds)
+    flag_data : np.ndarray
+        Initial fixation per trial
+    rt_data : np.ndarray
+        Reaction times per trial (seconds)
+    """
+    sacc_data = []
+    flag_data = []
+    rt_data = []
+
+    eps = 1e-12
+
+    for fix in fixation_trials:
+        fix = np.asarray(fix, dtype=int)
+
+        # initial fixation
+        flag_data.append(fix[0])
+
+        # reaction time (inclusive)
+        rt_data.append((len(fix) - 1) * dt)
+
+        # detect fixation switches (indices)
+        switch_idxs = np.where(fix[1:] != fix[:-1])[0] + 1
+
+        # map indices -> times inside ((k-1)dt, kdt]
+        sacc_times = switch_idxs * dt - eps
+
+        # prepend true start time (left-inclusive)
+        sacc_times = np.insert(sacc_times, 0, 0.0)
+
+        # pad with zeros up to max_d
+        padded = np.zeros(max_d, dtype=float)
+        n = min(len(sacc_times), max_d)
+        padded[:n] = sacc_times[:n]
+
+        sacc_data.append(padded)
+
+    return sacc_data, np.array(flag_data), np.array(rt_data)
+
+def expand_fixations(sacc_data, flag_data, rt_data, dt):
+    """
+    Parameters
+    ----------
+    sacc_data : list of 1D np.ndarray
+        saccade times per trial (seconds)
+    flag_data : 1D np.ndarray
+        initial fixation per trial (0/1 or similar)
+    rt_data : 1D np.ndarray
+        reaction time per trial (seconds)
+    dt : float
+        timestep size (seconds)
+
+    Returns
+    -------
+    array
+        Each element is a tuple of fixation locations for one trial
+    """
+    all_trials = []
+
+    for saccs, start_fix, rt in zip(sacc_data, flag_data, rt_data):
+
+        # number of discrete timesteps (inclusive rt)
+        fix_len = int(floor(rt / dt)) + 1
+
+        # initialize fixation array
+        fix = np.full(fix_len, start_fix)
+
+        if len(saccs) > 0:
+            # convert saccade times to indices
+            switch_idxs = [int(ceil(s / dt)) for s in saccs]
+
+            # apply alternating flips
+            for idx in switch_idxs[1:]:
+                if idx >= fix_len or idx <= 0:
+                    continue
+                fix[idx:] = 1 - fix[idx]
+
+        all_trials.append(tuple(int(x) for x in fix))
+
+    return all_trials
+
 def expand_addm_fixations(sacc_data, flag_data, rt_data, dt):
     """
     Parameters
@@ -71,12 +170,8 @@ def rasterize_data(
     fixnum_col: str | None = None,
     keep_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """
-    Expand per-(subject, trial) fixation sequences into fixation-level rows.
-    Zero-valued segments are treated as transitions and excluded.
-    """
 
-    df = df.copy()
+    fill_codes = set(fill_codes)
 
     if keep_cols is None:
         keep_cols = [
@@ -86,41 +181,36 @@ def rasterize_data(
 
     rows = []
 
-    for _, row in df.iterrows():
-        seq = np.asarray(row[seq_col])
+    for row in df.itertuples(index=False):
 
-        changes = np.diff(seq, prepend=seq[0])
-        starts = np.where(changes != 0)[0]
+        seq = np.asarray(getattr(row, seq_col))
 
-        fix_num = 0
+        changes = np.flatnonzero(seq[1:] != seq[:-1]) + 1
+        starts = np.concatenate(([0], changes))
+        ends = np.concatenate((changes, [len(seq)]))
+        locs = seq[starts]
 
-        for i, start_idx in enumerate(starts):
-            loc = seq[start_idx]
+        mask = ~np.isin(locs, fill_codes)
 
-            end_idx = (
-                starts[i + 1]
-                if i + 1 < len(starts)
-                else len(seq)
-            )
+        starts = starts[mask]
+        ends = ends[mask]
+        locs = locs[mask]
 
-            # Skip transitions
-            if loc in fill_codes:
-                continue
+        keep_vals = {c: getattr(row, c) for c in keep_cols}
+
+        for i in range(len(starts)):
 
             data = {
-                subject_col: row[subject_col],
-                trial_col: row[trial_col],
-                start_col: start_idx,
-                end_col: end_idx,
-                loc_col: loc,
+                subject_col: getattr(row, subject_col),
+                trial_col: getattr(row, trial_col),
+                start_col: starts[i],
+                end_col: ends[i],
+                loc_col: locs[i],
+                **keep_vals,
             }
 
             if fixnum_col is not None:
-                data[fixnum_col] = fix_num
-                fix_num += 1
-
-            for col in keep_cols:
-                data[col] = row[col]
+                data[fixnum_col] = i
 
             rows.append(data)
 
