@@ -1,0 +1,1 @@
+Reconcile rasterization functions with pyddm preprocessing.

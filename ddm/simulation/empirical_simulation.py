@@ -1,5 +1,5 @@
 import numpy as np
-from ddm.models import aDDModel
+from ..models.addm_model import aDDModel
 from efficient_fpt.utils import get_alternating_addm_mu_array
 
 def simulate_empirical_trial(
