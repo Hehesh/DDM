@@ -35,5 +35,5 @@ def simulate(dt, model_conditions, trials, seed=42, save_results=True):
         simulated_df = results_df[['choice', 'RT', 'avgWTP_left', 'avgWTP_right', 'fixation']]
         if not os.path.exists('simulated_data'):
             os.makedirs('simulated_data')
-        simulated_df.to_csv(os.path.join('simulated_data', f'sim_trials_s{seed}_d{model_conditions['drift_rate']}_t{model_conditions['theta']}_n{model_conditions['noise']}.csv'), index=False)
+        simulated_df.to_csv(os.path.join('simulated_data', f"sim_trials_s{seed}_d{model_conditions['drift_rate']}_t{model_conditions['theta']}_n{model_conditions['noise']}.csv"), index=False)
     return results_df
