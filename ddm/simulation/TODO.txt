@@ -1,1 +1,2 @@
 Double check random generation in trial_generation/create_trials
+Make consistent 0.5 bias or empirical bias in all simulate functions
