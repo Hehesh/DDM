@@ -78,6 +78,7 @@ def simulate_numbered_empirical_trial(
     r1_data,
     r2_data,
     empirical_distributions,
+    left_bias,
     *,
     eta, kappa, sigma, a, b, T, x0, dt, seed
 ):
@@ -87,8 +88,10 @@ def simulate_numbered_empirical_trial(
     r2 = r2_data[n]
 
     # --- Generate fixations ---
-    # flag = rng.binomial(1, empirical_distributions['probFixLeftFirst']) # 1 for left first, 0 for right first
-    flag = rng.binomial(1, 0.5) 
+    if left_bias:
+        flag = rng.binomial(1, empirical_distributions['probFixLeftFirst']) # 1 for left first, 0 for right first
+    else:
+        flag = rng.binomial(1, 0.5) 
 
     fixations = []
     total_dur = 0.0
