@@ -158,7 +158,7 @@ def expand_addm_fixations(sacc_data, flag_data, rt_data, dt):
 
     return all_trials
 
-def rasterize_data(
+def my_rasterize_data(
     df: pd.DataFrame,
     subject_col: str,
     trial_col: str,
@@ -171,26 +171,24 @@ def rasterize_data(
     keep_cols: list[str] | None = None,
 ) -> pd.DataFrame:
 
-    fill_codes = set(fill_codes)
-
     if keep_cols is None:
-        keep_cols = [
-            c for c in df.columns
-            if c not in {subject_col, trial_col, seq_col}
-        ]
+        excluded = {subject_col, trial_col, seq_col, start_col, end_col, loc_col}
+        if fixnum_col is not None:
+            excluded.add(fixnum_col)
+
+        keep_cols = [c for c in df.columns if c not in excluded]
 
     rows = []
 
     for row in df.itertuples(index=False):
-
-        seq = np.asarray(getattr(row, seq_col))
+        seq = np.asarray(getattr(row, seq_col), dtype=np.int64)
 
         changes = np.flatnonzero(seq[1:] != seq[:-1]) + 1
         starts = np.concatenate(([0], changes))
         ends = np.concatenate((changes, [len(seq)]))
         locs = seq[starts]
 
-        mask = ~np.isin(locs, fill_codes)
+        mask = ~np.isin(locs, list(fill_codes))
 
         starts = starts[mask]
         ends = ends[mask]
@@ -199,14 +197,13 @@ def rasterize_data(
         keep_vals = {c: getattr(row, c) for c in keep_cols}
 
         for i in range(len(starts)):
-
             data = {
+                **keep_vals,
                 subject_col: getattr(row, subject_col),
                 trial_col: getattr(row, trial_col),
                 start_col: starts[i],
                 end_col: ends[i],
                 loc_col: locs[i],
-                **keep_vals,
             }
 
             if fixnum_col is not None:
