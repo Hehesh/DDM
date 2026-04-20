@@ -158,7 +158,7 @@ def expand_addm_fixations(sacc_data, flag_data, rt_data, dt):
 
     return all_trials
 
-def my_rasterize_data(
+def rasterize_data(
     df: pd.DataFrame,
     subject_col: str,
     trial_col: str,
